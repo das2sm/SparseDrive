@@ -71,19 +71,26 @@ March 31st Baseline:
 
 ## 📍 Month 3 (June): Closing the Loop in Simulation
 
-**Goal:** Build a real-time closed-loop system.
+Goal: Integrate perception, planning, and SafeDrive (2026) reasoning in CARLA.
+
+Core Tasks:
+
+    SWNet Implementation: Use SparseDrive’s instance queries to build a "Sparse World" in the simulator.
+
+    FRNet Integration: Apply SafeDrive’s fine-grained safety checks to the trajectory menu.
+
+    Closed-Loop Demo: CARLA → SparseDrive → Safety Filter → Controller → CARLA.
+
+**Goal:** Integrate perception, planning, and SafeDrive (2026) reasoning in CARLA.
 
 ### Core Tasks:
 
 * Integrate with **CARLA simulator**:
 
-  * Camera → model input
-  * Model output → control commands
-* Establish full pipeline:
+  * SWNet Implementation: Use SparseDrive’s instance queries to build a "Sparse World" in the simulator.
+  * FRNet Integration: Apply SafeDrive’s fine-grained safety checks to the trajectory menu.
+  * Closed-Loop Demo: CARLA → SparseDrive → Safety Filter → Controller → CARLA
 
-  ```
-  CARLA → camera → SparseDrive → trajectory → controller → CARLA vehicle
-  ```
 * Ensure stable real-time operation
 
 ### Deliverable:
