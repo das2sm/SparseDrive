@@ -19,6 +19,7 @@ echo "nuScenes drive found."
 echo "Starting SparseDrive container..."
 
 sudo docker run --gpus all -it \
+    --shm-size=16G \
     -v ${REPO_PATH}:/workspace/SparseDrive \
     -v ${NUSCENES_PATH}:/workspace/SparseDrive/data/nuscenes \
     ${IMAGE_NAME} bash

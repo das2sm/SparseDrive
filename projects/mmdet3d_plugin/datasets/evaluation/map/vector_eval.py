@@ -1,8 +1,9 @@
 import prettytable
+import gc
 from typing import Dict, List, Optional
 from time import time
 from copy import deepcopy
-from multiprocessing import Pool
+from multiprocessing import Pool, pool
 from logging import Logger
 from functools import partial, cached_property
 
@@ -16,9 +17,9 @@ from mmdet.datasets import build_dataset, build_dataloader
 
 from .AP import instance_match, average_precision
 
-INTERP_NUM = 200 # number of points to interpolate during evaluation
+INTERP_NUM = 100 # number of points to interpolate during evaluation
 THRESHOLDS = [0.5, 1.0, 1.5] # AP thresholds
-N_WORKERS = 16 # num workers to parallel
+N_WORKERS = 0 # num workers to parallel
 
 class VectorEvaluate(object):
     """Evaluator for vectorized map.
@@ -194,6 +195,7 @@ class VectorEvaluate(object):
 
         result_dict = {}
 
+        gc.collect()
         print(f'\nevaluating {len(self.id2cat)} categories...')
         start = time()
         if self.n_workers > 0:
@@ -211,7 +213,8 @@ class VectorEvaluate(object):
 
             fn = partial(self._evaluate_single, thresholds=self.thresholds, metric=metric)
             if self.n_workers > 0 and len(samples) > 81:
-                tpfp_score_list = pool.starmap(fn, samples)
+                chunksize = max(1, len(samples) // (self.n_workers * 4))
+                tpfp_score_list = pool.starmap(fn, samples, chunksize=chunksize)
             else:
                 tpfp_score_list = []
                 for sample in samples:
@@ -243,6 +246,7 @@ class VectorEvaluate(object):
         
         if self.n_workers > 0:
             pool.close()
+            pool.join()
         
         mAP = sum_mAP / len(self.id2cat.keys())
         result_dict.update({'mAP': mAP})

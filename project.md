@@ -1,186 +1,79 @@
-# 🎯 Project Overview: Closed-Loop Sparse Perception
-
-The objective of this project is to move beyond passive, open-loop perception and build a **closed-loop autonomous driving system**.
-
-Instead of evaluating models like SparseOcc on static datasets, the system will use sparse perception outputs to directly inform **real-time control decisions** (steering, braking, acceleration) inside a simulation environment.
-
-The pipeline will integrate:
-
-* **Perception + Planning** via SparseDrive
-* **Control algorithms** (Pure Pursuit / PID)
-* **Simulation** via CARLA
-
-Your primary compute platform will be the **NVIDIA GeForce RTX 3090**.
 
 ---
 
-# 🗓️ 5-Month Roadmap (April – August)
+# 🎯 Project Overview: Hybrid Sparse Closed-Loop Systems
+
+The goal is to build a **Hybrid Sparse Perception** system that combines instance-based tracking (SparseDrive) with geometry-based occupancy (SparseOcc) to drive a vehicle in CARLA. By using sparse queries for both, we keep the compute cost low enough for high-frequency control on the RTX 3090.
 
 ---
 
-## 📍 Month 1 (April): SparseDrive Setup & Baseline
-March 31st Baseline:
-
-    Model: SparseOcc (ResNet-50)
-
-    Hardware: NVIDIA RTX 3090 (24GB)
-
-    Inference Speed: 16.0 FPS / 62.5ms
-
-    Accuracy: 0.368 (RayIoU)
-
-**Goal:** Establish a working perception + planning backbone.
-
-### Core Tasks:
-
-* Clone the SparseDrive repository
-* Resolve dependencies using your existing Docker environment
-* Compile any required CUDA extensions
-* Run **inference first**, then validation on the nuScenes dataset
-* Understand model outputs:
-
-  * instance queries
-  * trajectories
-  * occupancy representations
-
-### Deliverable:
-
-* A verified SparseDrive pipeline running locally
-* Baseline performance metrics and successful inference outputs
+# 🗓️ Revised 5-Month Roadmap (April 2 – August 15)
 
 ---
 
-## 📍 Month 2 (May): Perception-to-Control Mapping
+## 📍 Phase 1: The Occupancy Pivot (April)
+**Goal:** Integrate SparseOcc and establish the "Dual-Stream" perception backbone.
 
-**Goal:** Convert model outputs into actionable vehicle commands.
+*   **SparseOcc Integration:** Clone and configure the SparseOcc repository. Since you already have the SparseDrive environment, focus on shared CUDA extensions (like `Deformable Attention`).
+*   **The Hybrid Head:** Modify the inference script to run SparseDrive (for "Who" is there) and SparseOcc (for "What" is the general geometry) in parallel.
+*   **Coordinate Sync:** Ensure both models are outputting in the same Voxel/Ego coordinate space.
 
-### Core Tasks:
-
-* Extract planned trajectories / waypoints from SparseDrive outputs
-* Implement a control module:
-
-  * Start with **Pure Pursuit** (trajectory following)
-  * Optionally compare with **PID control**
-* Map trajectory → steering, throttle, braking
-
-### Deliverable:
-
-* A working control module that converts perception outputs into real vehicle commands
+**Deliverable:** A unified inference script that outputs 3D Bounding Boxes **and** a 3D Occupancy Grid at >15 FPS.
 
 ---
 
-## 📍 Month 3 (June): Closing the Loop in Simulation
+## 📍 Phase 2: The Control Bridge (May)
+**Goal:** Transform "Imagined" paths into physical steering/throttle commands.
 
-Goal: Integrate perception, planning, and SafeDrive (2026) reasoning in CARLA.
+*   **Pure Pursuit Implementation:** Use the 0.60m L2-accurate waypoints to calculate steering angle $\delta$:
+    $$\delta = \arctan\left(\frac{2L \sin(\alpha)}{l_d}\right)$$
+*   **PID Tuning:** Implement a longitudinal PID controller for throttle/brake to maintain the target velocity predicted by the planning head.
+*   **CARLA Client Setup:** Build the bridge to send images from CARLA's 6-camera rig into your model and receive the `VehicleControl` object back.
 
-Core Tasks:
 
-    SWNet Implementation: Use SparseDrive’s instance queries to build a "Sparse World" in the simulator.
 
-    FRNet Integration: Apply SafeDrive’s fine-grained safety checks to the trajectory menu.
-
-    Closed-Loop Demo: CARLA → SparseDrive → Safety Filter → Controller → CARLA.
-
-**Goal:** Integrate perception, planning, and SafeDrive (2026) reasoning in CARLA.
-
-### Core Tasks:
-
-* Integrate with **CARLA simulator**:
-
-  * SWNet Implementation: Use SparseDrive’s instance queries to build a "Sparse World" in the simulator.
-  * FRNet Integration: Apply SafeDrive’s fine-grained safety checks to the trajectory menu.
-  * Closed-Loop Demo: CARLA → SparseDrive → Safety Filter → Controller → CARLA
-
-* Ensure stable real-time operation
-
-### Deliverable:
-
-* First successful **closed-loop autonomous driving demo**
-* Vehicle navigates using live model predictions
+**Deliverable:** A standalone Python controller that can "drive" a CARLA vehicle using pre-recorded model trajectories.
 
 ---
 
-## 📍 Month 4 (July): Stress Testing & Evaluation
+## 📍 Phase 3: Closing the Hybrid Loop (June)
+**Goal:** First full "Eyes-to-Actuators" run in simulation.
 
-**Goal:** Evaluate system robustness under realistic conditions.
+*   **The Conflict Resolver:** Write logic to handle discrepancies. 
+    *   *Example:* If SparseDrive says "Path is Clear" but SparseOcc detects an occupancy voxel (like a fallen tree), the controller must prioritize the Occupancy grid for braking.
+*   **Latency Optimization:** Profile the "Photon-to-Control" latency. Aim for <100ms total round-trip to ensure the 3090 can keep up with a 20km/h cruise.
+*   **SWNet Integration:** Use SparseDrive’s instance queries to populate the "Sparse World" for the simulator's reasoning.
 
-### Core Tasks:
-
-* Run simulations across varied conditions:
-
-  * weather (rain, fog, night)
-  * traffic density
-  * occlusions
-* Log and analyze:
-
-  * end-to-end latency (ms)
-  * control frequency (Hz)
-  * trajectory deviation
-  * collision rate
-* Identify failure cases:
-
-  * small objects
-  * dynamic obstacles
-  * perception degradation
-
-### Deliverable:
-
-* A structured dataset of logs and failure cases
-* Quantitative and qualitative evaluation of system performance
+**Deliverable:** First successful video of the car navigating a simple CARLA "Town" using live Hybrid Sparse Perception.
 
 ---
 
-## 📍 Month 5 (August): Final Report & Portfolio Output
+## 📍 Phase 4: Stress Testing & "Sparse-Only" Robustness (July)
+**Goal:** Prove the thesis that sparse is better/faster than dense.
 
-**Goal:** Package your work into strong, presentable deliverables.
+*   **Environmental Stress:** Test in CARLA’s "Epic" weather (Heavy Rain/Night). Observe how SparseOcc handles visibility degradation compared to Bounding Boxes.
+*   **Edge Case Collection:** Focus on "The Un-classifiables"—obstacles that aren't in the nuScenes categories (e.g., a stroller, a box in the road).
+*   **Comparison Study:** Quantify the CPU/GPU usage of this Sparse+Sparse approach vs. a traditional Dense Occupancy approach.
 
-### Core Tasks:
+**Deliverable:** A "Failure Atlas" documenting exactly where the sparse representation breaks down.
 
-* Write a **Robustness Report**:
+---
 
-  * system architecture
-  * evaluation metrics
-  * failure analysis
-  * key insights
-* Produce a **“Hero Video”**:
+## 📍 Phase 5: Synthesis & Portfolio (August 1 – August 15)
+**Goal:** Finalize documentation and high-quality visualization.
 
-  * simulator view
-  * sparse 3D perception visualization
-  * trajectory + control overlay
-* (Optional) Draft a research-style paper
+*   **The "Hero Video":** A split-screen masterpiece showing:
+    1.  CARLA Third-Person View.
+    2.  6-Camera SparseDrive Overlays.
+    3.  3D SparseOcc Voxel Grid.
+    4.  Real-time Planning/Control Graphs.
+*   **Final Report:** Summarize the NDS/AMOTA metrics from April and the "Success Rate" metrics from the July CARLA trials.
 
-### Deliverable:
-
-* Final report documenting your findings
-* Polished demo video showcasing the full closed-loop system
+**Deliverable:** A GitHub-ready repository and a technical report suitable for a research portfolio or a pre-print paper.
 
 ---
 
 # 🧠 Core Research Question
-
-> **Can sparse 3D perception enable faster and more robust closed-loop control compared to traditional dense representations?**
-
----
-
-# 🏁 Final Outcome
-
-By the end of this project, you will have built a complete system:
-
-```
-Perception → Planning → Control → Simulation → Evaluation
-```
-
-This demonstrates:
-
-* understanding of modern perception models
-* integration with control systems
-* real-time system design
-* robustness analysis under realistic conditions
-
-👉 This is directly aligned with industry roles in:
-
-* autonomous driving
-* robotics
-* intelligent systems engineering
+> **"Does combining Sparse Instance Tracking with Sparse Occupancy provide a sufficient safety margin for closed-loop control without the overhead of dense 3D cost maps?"**
 
 ---
