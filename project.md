@@ -1,6 +1,6 @@
 ### 🧠 Project Identity
 * **Title:** *The Geometric Gap: Quantifying the Indispensability of Occupancy in Sparse End-to-End Driving.*
-* **The Thesis:** Sparse models (Map+Agents) are highly efficient but "semantically blind" to unstructured obstacles. A lightweight **Geometric Veto** is the only way to achieve 100% safety.
+* **The Thesis:** Sparse models (Map+Agents) are highly efficient but "semantically blind" to unstructured obstacles. Adding a lightweight **Geometric Veto** can increase safety.
 
 ---
 
@@ -10,16 +10,14 @@
 **Goal:** Get the car moving
 1.  **Repo Setup:** Clone `SparseDriveV2` and `Bench2Drive-VL`.
 2.  **The Bridge:** Connect SparseDrive's output waypoints to a PID controller (lifted from `Carla Garage`). 
-3.  **Visual Proof:** Use the CARLA `debug.draw_point` API to draw the waypoints. If they appear on the road in front of the car, move to Phase 2.
-    * **Rule:** If you are still fighting coordinate transforms by April 20, use the **Bench2Drive-VL** integrated evaluator—don't write your own.
+3.  **Visual Proof:** Use the **Bench2Drive-VL** integrated evaluator
 
 #### Phase 2: The Failure Atlas (April 26 – May 20)
-**Goal:** Prove that the $30,000 GPU is blind to a $5 box.
 1.  **Scenario Scripting:** Use the CARLA Python API to create a "Stress Test" script.
 2.  **The Anomalies:**
     * **The Fallen Tree:** A static mesh prop that isn't a "car" or "pedestrian."
     * **The Debris Field:** 10 random cardboard boxes scattered across a high-speed turn.
-3.  **The Result:** Record SparseDrive crashing into these. This is your "Motivation" video.
+3.  **The Result:** Record SparseDrive crashing into these. 
 
 #### Phase 3: The Geometric Veto (May 21 – June 30)
 **Goal:** The actual engineering contribution.
@@ -56,8 +54,8 @@
 ---
 
 ### 🛑 Strategic Constraints (To Finish on Time)
-1.  **No Backbone Training:** You have a 3090. Do not try to finetune ResNet. It is a "frozen" feature extractor.
-2.  **Logic-Over-Architecture:** A 10-line "If-Then" Veto is better than a complex Transformer fusion that takes 2 months to debug.
+1.  **No Backbone Training:** Do not try to finetune ResNet. It is a "frozen" feature extractor.
+2.  **Logic-Over-Architecture:** A simple veto is better than a complex Transformer fusion that takes 2 months to debug.
 3.  **Simplicity Wins:** Your project is a **study**, not a product. If the car stops safely, you win.
 
 ---
