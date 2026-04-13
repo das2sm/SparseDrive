@@ -206,7 +206,3 @@
 ### The Winning Framing
 
 > *“We expose a blind spot in how autonomous driving systems are evaluated—and show a simple, effective way to mitigate it.”*
-
-
-* a **full CVPR-style Introduction section**, or
-* your **Method section with equations + diagrams** (that’s the next big step)
