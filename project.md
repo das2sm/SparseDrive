@@ -1,208 +1,350 @@
-# The Geometric Safety Project
+# The Optimized VAD Safety Guardian Roadmap
+
+## The Core Research Thesis
+**"Neuro-Symbolic Safety Grounding: Restoring class-agnostic obstacle awareness to vectorized autonomous driving through lightweight fuzzy arbitration"**
+
+**Why this matters:** VAD achieves 9.3x speed-up by eliminating dense representations, but creates a safety paradox—objects outside its learned query vocabulary become "invisible." This contribution proves safety doesn't require expensive retraining or dense models.
 
 ---
 
-### Project Identity
+## Phase 1: Diagnostic Foundation (April 23 – May 15)
+**Objective:** Establish quantitative proof of VAD's geometric blind spot + achieve simulation efficiency
 
-* **Title:** *The Geometric Gap: Evaluating and Mitigating Out-of-Distribution Failures in Sparse End-to-End Driving.*
-* **The Thesis:** Sparse end-to-end driving models are highly efficient but exhibit **systematic degradation in out-of-distribution (OOD) scenarios involving unstructured obstacles**. Introducing a lightweight **Geometric Safety Filter**—based on explicit geometric reasoning—can significantly improve safety without sacrificing real-time performance.
+### Week 1-2: Infrastructure Hardening (April 23 – May 6)
+**Critical path items:**
 
----
+1. **Speed Fix Deployment** (Day 1-2):
+   ```python
+   # In VAD_transformer.py, line 248:
+   # OLD: tensor = torch.tensor(numpy_list)  
+   # NEW: tensor = torch.from_numpy(np.stack(numpy_list))
+   ```
+   - Apply the fix
+   - Run 5 test routes, measure sim/real ratio
+   - **Success metric:** Achieve ≥0.3x ratio (target: 0.5x)
 
-### The Master Schedule
+2. **Minimal Scenario Setup** (Day 3-5):
+   - Modify `routes_testing.xml` to create 5 "canonical failure" scenarios:
+     - Scenario A: Static crate in straight lane
+     - Scenario B: Traffic cone mid-turn
+     - Scenario C: Fallen debris (branch/barrel)
+     - Scenario D: Unexpected static vehicle (perpendicular)
+     - Scenario E: Construction barrier cluster
+   - Use `--num-vehicles 0` for initial testing
+   - **Success metric:** Each scenario runs to completion at ≥0.3x ratio
 
----
+3. **BEV Visualization Pipeline** (Day 6-10):
+   ```python
+   # In VADAgent.run_step():
+   # Extract BEV queries
+   agent_queries = output_dict['agent_queries']  # Shape: [N, 256]
+   map_queries = output_dict['map_queries']      # Shape: [M, 256]
+   
+   # Visualize
+   bev_img = render_bev(agent_queries, map_queries, camera_frame)
+   save_frame(bev_img, timestamp)
+   ```
+   - Create side-by-side recorder: camera feed + BEV visualization
+   - **Success metric:** 1 complete "smoking gun" video showing collision with no BEV vector
 
-#### Phase 1: The Infrastructure Heist (April 13 – May 3)
+### Week 3: Quantitative Failure Analysis (May 7 – May 15)
 
-**Goal:** Get the system running + define the problem correctly
+4. **Entropy Metric Validation** (Critical for Phase 2):
+   ```python
+   # Compute attention entropy at each timestep
+   attention_weights = output_dict['cross_attention']  # [num_heads, N_queries, N_features]
+   entropy = -torch.sum(attention_weights * torch.log(attention_weights + 1e-9), dim=-1)
+   avg_entropy = entropy.mean()
+   
+   # Hypothesis: High entropy correlates with imminent failures
+   ```
+   - Run baseline VAD on all 5 scenarios
+   - Log: collision_frame, entropy_at_collision, entropy_5s_before, entropy_10s_before
+   - **Success metric:** Entropy increases by ≥30% in 10s window before OOD collisions
 
-1. **Repo Setup:** Clone `SparseDriveV2` and `Bench2Drive-VL`, install CARLA 0.9.15, verify GPU + FPS (≥7 FPS target).
-2. **The Bridge:** Connect SparseDrive trajectory outputs to a PID controller (from `Carla Garage`).
-3. **Baseline Runs:** Execute 20 Bench2Drive routes, record:
+5. **Baseline Metrics Collection**:
+   - Run VAD on 20 diverse Bench2Drive routes (representative sample)
+   - Record: Success Rate, Collision Count, Route Completion %, Avg FPS
+   - **Target baseline:** ~60-70% success rate (typical for OOD scenarios)
 
-   * Driving Score (DS)
-   * Collision Rate (CR)
-   * Success Rate (SR)
-4. **Define the Problem:**
-
-   * Clearly define **in-distribution vs. OOD scenarios**
-   * Formalize **unsafe trajectory**:
-
-     > A trajectory is unsafe if it intersects occupied space within horizon (T)
-5. **The Metric (Key Contribution):**
-
-   * **Geometric Gap (Scenario-Level):**
-     [
-     GG_{scenario} = CR_{OOD} - CR_{ID}
-     ]
-   * **Geometric Gap (Decision-Level):**
-     [
-     GG_{decision} = \frac{\text{Unsafe Plans Accepted}}{\text{Total Unsafe Plans}}
-     ]
-
----
-
-#### Phase 2: The Failure Atlas (May 4 – May 25)
-
-**Goal:** Build the benchmark that exposes the problem
-
-1. **Scenario Scripting:** Use CARLA Python API to create reproducible stress tests.
-2. **Scenario Taxonomy (Important for paper):**
-
-   * **Unknown Object:** Fallen Tree
-   * **Fragmented Geometry:** Debris Field
-   * **Misplaced Known Object:** Stalled vehicle (no signals)
-   * **Partial Visibility:** Occluded barrier
-3. **The Anomalies:**
-
-   * **The Fallen Tree:** Large object not represented as a semantic class
-   * **The Debris Field:** Multiple small obstacles breaking “free space”
-4. **The Result:**
-
-   * Run SparseDrive (≥5 runs per scenario)
-   * Measure CR, GG, and failure patterns
-   * Record BEV + ego-view videos
-5. **Outcome:**
-
-   * Establish that sparse models exhibit **higher failure rates in OOD scenarios (H1)**
-   * Package as **Failure Atlas (benchmark contribution)**
-
----
-
-#### Phase 3: The Geometric Safety Filter (May 26 – June 30)
-
-**Goal:** Introduce and validate geometric reasoning
-
-1. **The “Simple Geometry” Baseline (Point Cloud)**
-
-   * Project trajectory into 3D space
-   * Count LiDAR points in safety region
-   * If density > threshold → brake
-   * Tests: Does geometry alone improve safety?
-
-2. **The “Learned Geometry” Upgrade (Occupancy)**
-
-   * Integrate `SparseOcc` decoder (no retraining)
-   * Predict occupancy probabilities along trajectory
-   * If ( p_{occ} > 0.7 ) → trigger safety filter
-
-3. **The Core Experiment (Critical)**
-
-   * **Config A:** Vanilla SparseDrive
-   * **Config B:** Semantic Safety (map-based)
-   * **Config C:** Geometric (point cloud)
-   * **Config D:** Geometric (occupancy)
-
-4. **Hypothesis Testing:**
-
-   * **H2:** Geometric filtering reduces OOD failures
-   * **H3:** Improvement holds across representations (C vs D)
-
-5. **Expected Result:**
-
-   * Semantic-only safety still fails on OOD
-   * Geometric filtering significantly reduces collisions
+**Phase 1 Deliverables:**
+- [ ] 1 "smoking gun" video with BEV visualization
+- [ ] Entropy correlation analysis (scatter plot: entropy vs. collision probability)
+- [ ] Baseline performance table (20 routes)
+- [ ] Infrastructure achieving ≥0.3x simulation speed
 
 ---
 
-#### Phase 4: Data Grinding (July 1 – July 25)
+## Phase 2: Guardian Integration (May 16 – June 15)
+**Objective:** Build the fuzzy arbitration layer without training neural components
 
-**Goal:** Turn results into publishable evidence
+### Week 4-5: Occupancy Integration (May 16 – May 29)
 
-1. **The Benchmark:**
+1. **Frozen Occupancy Setup** (Day 1-3):
+   - Download pre-trained OccNet or BEVFormer weights (nuScenes checkpoint)
+   - **Fallback option:** Use CARLA's ground-truth occupancy API initially
+   ```python
+   # CARLA ground-truth (for initial tuning):
+   world = self.client.get_world()
+   occupancy_grid = world.get_occupancy_grid(ego_location, grid_size=50)
+   
+   # Later swap to neural:
+   occupancy_pred = occnet_model(sensor_inputs)
+   ```
+   - **Decision point:** If neural occupancy causes VRAM issues, proceed with ground-truth for Phases 2-3, defer neural swap to Phase 4
 
-   * Run all 200+ scenarios in `Bench2Drive-VL`
-   * Evaluate both baseline and filtered models
+2. **Geometric Conflict Detector** (Day 4-7):
+   ```python
+   def compute_conflict_score(waypoints, occupancy_grid, vehicle_footprint):
+       """
+       waypoints: [6, 3] - VAD's predicted path (x, y, yaw)
+       occupancy_grid: [H, W, D] - probability voxels
+       Returns: conflict_score in [0, 1]
+       """
+       total_conflict = 0
+       for wp in waypoints:
+           # Project vehicle footprint at this waypoint
+           voxel_indices = project_footprint_to_voxels(wp, vehicle_footprint)
+           # Sum occupancy probabilities
+           total_conflict += occupancy_grid[voxel_indices].sum()
+       return min(total_conflict / threshold, 1.0)
+   ```
+   - Test on 5 canonical scenarios
+   - **Success metric:** Conflict score >0.7 for all actual collisions, <0.3 for safe routes
 
-2. **Metrics:**
+3. **Entropy Feature Extraction** (Day 8-10):
+   ```python
+   def compute_situational_awareness(attention_maps):
+       """
+       Low entropy = model is confident/focused
+       High entropy = model is confused/uncertain
+       Returns: SA score in [0, 1], where 0=confused, 1=confident
+       """
+       entropy = compute_entropy(attention_maps)
+       # Normalize: typical VAD entropy range is [0.5, 3.5]
+       SA = 1 - normalize(entropy, min=0.5, max=3.5)
+       return SA
+   ```
 
-   * Driving Score (DS)
-   * Infraction Score (IS)
-   * Collision Rate (CR)
-   * Geometric Gap (GG)
+### Week 6-7: Fuzzy Arbitration Engine (May 30 – June 15)
 
-3. **Statistical Rigor (Non-negotiable):**
+4. **FIS Design** (Day 1-4):
+   ```python
+   import skfuzzy as fuzz
+   from skfuzzy import control as ctrl
+   
+   # Input variables
+   conflict = ctrl.Antecedent(np.arange(0, 1.1, 0.01), 'conflict')
+   SA = ctrl.Antecedent(np.arange(0, 1.1, 0.01), 'situational_awareness')
+   TTC = ctrl.Antecedent(np.arange(0, 10, 0.1), 'time_to_collision')
+   
+   # Output variable
+   safety_weight = ctrl.Consequent(np.arange(0, 1.1, 0.01), 'safety_weight')
+   
+   # Membership functions
+   conflict['negligible'] = fuzz.trimf(conflict.universe, [0, 0, 0.3])
+   conflict['low'] = fuzz.trimf(conflict.universe, [0.2, 0.4, 0.6])
+   conflict['significant'] = fuzz.trimf(conflict.universe, [0.5, 0.7, 0.9])
+   conflict['critical'] = fuzz.trimf(conflict.universe, [0.8, 1.0, 1.0])
+   
+   # Define 12-15 fuzzy rules
+   rule1 = ctrl.Rule(conflict['critical'] & SA['low'], safety_weight['maximum'])
+   rule2 = ctrl.Rule(conflict['negligible'] & SA['high'], safety_weight['minimum'])
+   # ... etc
+   ```
 
-   * ≥5 runs per configuration
-   * Report mean ± std
-   * Perform significance testing (t-test / bootstrap)
+5. **Plan Blending Implementation** (Day 5-7):
+   ```python
+   def blend_trajectories(vad_traj, safe_traj, safety_weight):
+       """
+       vad_traj: [6, 3] - nominal VAD waypoints
+       safe_traj: [6, 3] - emergency maneuver (brake/swerve)
+       safety_weight: scalar in [0, 1]
+       """
+       return (1 - safety_weight) * vad_traj + safety_weight * safe_traj
+   
+   # Emergency maneuver options:
+   # Option 1: Hard brake (decelerate to zero)
+   # Option 2: Gentle deceleration (coast)
+   # Option 3: Lane-keeping swerve (if space available)
+   ```
 
-4. **Key Result:**
+6. **Integration Testing** (Day 8-14):
+   - Run full pipeline on 5 canonical scenarios
+   - Visualize: FIS inputs (Gc, SA, TTC) and output (ws) over time
+   - **Success metric:** System prevents all 5 collisions while maintaining trajectory smoothness (jerk <4 m/s³)
 
-   * OOD safety improves significantly
-   * Standard driving performance remains within ~5%
-
-5. **Failure Analysis:**
-
-   * False positives (over-braking)
-   * False negatives (missed obstacles)
+**Phase 2 Deliverables:**
+- [ ] Conflict detection module (unit tested)
+- [ ] Fuzzy arbitration engine (12+ rules defined)
+- [ ] Integrated VAD+Guardian running on 5 scenarios
+- [ ] Preliminary smoothness analysis
 
 ---
 
-#### Phase 5: The “Hero” Wrap-up (July 26 – August 15)
+## Phase 3: Validation & Optimization (June 16 – July 15)
+**Objective:** Prove Guardian superiority through systematic comparison
 
-**Goal:** Make it publishable + memorable
+### Week 8-9: Parameter Tuning (June 16 – June 29)
 
-1. **The Killer Visualization:**
+1. **Fuzzy Rule Optimization** (Grid search approach):
+   ```python
+   # Parameter space:
+   param_space = {
+       'conflict_thresholds': [[0.2,0.4,0.6], [0.3,0.5,0.7], [0.25,0.45,0.65]],
+       'SA_boundaries': [[0.3,0.6], [0.4,0.7], [0.35,0.65]],
+       'safety_weight_max': [0.8, 0.9, 1.0]
+   }
+   
+   # Objective function: 
+   # Maximize: collision_avoidance_rate + route_completion_rate
+   # Minimize: jerk + phantom_brake_count
+   
+   best_params = grid_search(param_space, scenarios=5, objective=combined_metric)
+   ```
+   - **Success metric:** ≥90% collision avoidance on 5 scenarios, jerk <3 m/s³
 
-   * Side-by-side comparison:
-     **“Semantic Intelligence vs. Geometric Reality”**
+2. **Ablation Components Setup** (Day 8-10):
+   - **Baseline:** Pure VAD (no guardian)
+   - **Hard-Switch:** Binary brake (if conflict >0.7: full brake, else: none)
+   - **Fuzzy-Guardian:** Your system
+   - **Oracle:** CARLA ground-truth + perfect planning (upper bound)
 
-     * Sparse model drives into obstacle
-     * Safety filter stops safely
+### Week 10-11: Full Benchmark Evaluation (June 30 – July 15)
 
-2. **The Paper (CVPR/CoRL style):**
+3. **The 220-Route Stress Test**:
+   ```bash
+   # Run all three systems on full Bench2Drive
+   python eval_agent.py --agent=vad_baseline --routes=all
+   python eval_agent.py --agent=hard_switch --routes=all  
+   python eval_agent.py --agent=fuzzy_guardian --routes=all
+   ```
+   - **Target metrics:**
+     - Success Rate: Fuzzy ≥ Hard-Switch +5% ≥ Baseline +15%
+     - Driving Score: Fuzzy ≥ Hard-Switch +10% (smoother)
+     - Inference FPS: Fuzzy ≥10 FPS (prove real-time capable)
+     - Collision Reduction: Fuzzy reduces OOD collisions by ≥60% vs. baseline
 
-   * Emphasize:
+4. **Statistical Significance**:
+   - Run each configuration 3 times (different random seeds)
+   - Use paired t-tests to prove Fuzzy vs. Hard-Switch difference is significant (p<0.05)
 
-     * Geometric Gap metric
-     * Failure Atlas benchmark
-     * Hypothesis-driven evaluation
-   * Avoid absolute claims:
-
-     > “improves robustness” (not “solves safety”)
-
-3. **The Insight Section (Important):**
-
-   * Why not fully learned?
-
-     * Long-tail events are underrepresented
-     * Learned systems lack guarantees
-     * Geometric filtering provides a **deterministic safety layer**
-
-4. **Final Polish:**
-
-   * Clean GitHub repo
-   * Reproducible scripts (one-command scenario runs)
-   * 60-second demo video
-
----
-
-### The "No-Reinvention" Tooling
-
-| Task                 | DO NOT BUILD      | USE THIS INSTEAD                      |
-| :------------------- | :---------------- | :------------------------------------ |
-| **Backbone/Weights** | Training          | **SparseDriveV2** (Official .pth)     |
-| **PID/Controller**   | Physics Math      | **Carla Garage** (`team_code/pid.py`) |
-| **Evaluator**        | Logging/Loops     | **Bench2Drive-VL** (`eval.py`)        |
-| **Occupancy**        | Voxel Logic       | **SparseOcc** (Decoder layers only)   |
-| **Visualization**    | Custom UI         | **ViDAR** (Open-source BEV viz)       |
-| **Point Cloud**      | Manual processing | **Open3D** (density checks)           |
-
----
-
-### Strategic Constraints (To Finish on Time)
-
-1. **No Backbone Training:** Keep feature extractor frozen—this is an evaluation study, not a training project.
-2. **Evaluation > Engineering:** Your main contribution is **measuring a gap**, not building a new architecture.
-3. **Geometry Over Semantics:** The key comparison is **semantic vs geometric reasoning**, not model complexity.
-4. **Statistical Rigor is Mandatory:** Every claim must be backed by repeated runs + significance.
-5. **Failure Atlas is First-Class:** Treat it as a **benchmark contribution**, not just a test script.
-6. **Defensible Claims Only:** Avoid “always” or “fails”—use “higher failure rate” and “improves robustness.”
+**Phase 3 Deliverables:**
+- [ ] Optimized fuzzy parameters
+- [ ] Ablation study results (3 systems × 220 routes × 3 seeds)
+- [ ] Statistical analysis report
+- [ ] Performance comparison table
 
 ---
 
-### The Winning Framing
+## Phase 4: Documentation & Positioning (July 16 – August 15)
+**Objective:** Transform code into a compelling research narrative
 
-> *“We expose a blind spot in how autonomous driving systems are evaluated—and show a simple, effective way to mitigate it.”*
+### Week 12-13: Qualitative Evidence (July 16 – July 29)
+
+1. **Highlight Reel Creation**:
+   - Select 8 "hero scenarios" where:
+     - Baseline crashes
+     - Hard-Switch brakes jerkily
+     - Fuzzy-Guardian smoothly avoids
+   - Create professional videos with:
+     - Multi-view (camera, BEV, occupancy grid, FIS dashboard)
+     - Real-time metrics overlay (ws, Gc, SA, speed)
+     - Slow-motion collision avoidance moments
+
+2. **Interpretability Showcase**:
+   ```
+   Frame 245: CONFLICT DETECTED
+   - Occupancy Conflict: 0.82 (Critical)
+   - Situational Awareness: 0.31 (Low - model confused)
+   - Time-to-Collision: 1.2s (Short)
+   → Fuzzy Rule Activated: R7 (Critical+Low+Short → ws=0.95)
+   → Action: Emergency deceleration initiated
+   ```
+
+### Week 14-15: Paper/Thesis Writing (July 30 – August 10)
+
+3. **Positioning Strategy**:
+
+   **Title:** "Class-Agnostic Safety Grounding for Vectorized Autonomous Driving via Neuro-Symbolic Arbitration"
+
+   **Abstract framework:**
+   - Problem: VAD's speed comes at safety cost (geometric blind spots)
+   - Gap: Dense retraining is computationally prohibitive
+   - Solution: Lightweight fuzzy guardian using frozen occupancy + attention entropy
+   - Result: 60% OOD collision reduction, 10% smoother driving, <1 FPS overhead
+   - Impact: Proves safety doesn't require expensive model scaling
+
+   **Key sections:**
+   - Introduction: The vectorized planning safety paradox
+   - Related Work: Position against UniAD (too heavy), SparseDrive (incomplete), pure-neural safety filters (black-box)
+   - Method: Your neuro-symbolic architecture
+   - Experiments: The ablation study is your centerpiece
+   - Discussion: Interpretability + computational efficiency + Taiwan industry relevance
+
+4. **Code & Data Release**:
+   - Clean GitHub repo with:
+     - `fuzzy_guardian/` module (plug-and-play)
+     - `scenarios/` (your 5 canonical test cases)
+     - `results/` (all 220-route logs)
+     - `visualization/` (BEV rendering tools)
+   - **Contribution:** First open-source class-agnostic safety layer for VAD
+
+### Week 16: Buffer & Polish (August 11 – August 15)
+
+5. **Contingency Week:**
+   - Fix any failed reviews
+   - Re-run experiments if needed
+   - Prepare presentation/defense
+
+**Phase 4 Deliverables:**
+- [ ] 8-video highlight reel
+- [ ] Complete paper draft (6-8 pages)
+- [ ] Public GitHub repository
+- [ ] Presentation slides
+
+---
+
+## Risk Mitigation & Decision Points
+
+### Critical Checkpoints
+
+**May 1 Checkpoint:** If sim ratio still <0.2x → Abandon 220-route goal, focus on 20 high-quality scenarios
+
+**May 15 Checkpoint:** If entropy doesn't correlate with failures → Drop SA metric, use only Gc + TTC (still publishable)
+
+**June 1 Checkpoint:** If neural occupancy causes VRAM overflow → Stick with ground-truth for main results, neural occupancy becomes "future work"
+
+**July 1 Checkpoint:** If fuzzy isn't beating hard-switch → Debug membership functions, consider PID-based blending as fallback
+
+### Technical Fallbacks
+
+| Risk | Trigger | Mitigation |
+|------|---------|------------|
+| VRAM overflow | >22GB usage | Use FP16, reduce batch size to 1, process frames sequentially |
+| Low FPS | <5 FPS | Reduce occupancy grid resolution (50m → 30m), use sparse voxels |
+| Entropy unreliable | Correlation <0.3 | Drop SA, focus on Gc + TTC (simpler but still novel) |
+| Hard to tune fuzzy | >100 iterations needed | Use Bayesian optimization or evolutionary algorithm |
+
+---
+
+## Success Metrics Summary
+
+### Must-Have (Required for August 15):
+- ✅ 1 "smoking gun" video proof of VAD blind spot
+- ✅ Fuzzy Guardian prevents ≥80% of baseline OOD collisions
+- ✅ System runs at ≥10 FPS on RTX 3090
+- ✅ Ablation shows Fuzzy > Hard-Switch in smoothness
+
+### Should-Have (Strong paper):
+- ✅ Entropy-SA metric validated
+- ✅ Full 220-route evaluation completed
+- ✅ Statistical significance proven (p<0.05)
+- ✅ 5+ hero scenario videos
+
+### Nice-to-Have (Exceptional impact):
+- ⭐ Neural occupancy working (vs. ground-truth)
+- ⭐ Tested on Fail2Drive OOD assets
+- ⭐ Real-world transfer experiment (if hardware available)
+
+---
