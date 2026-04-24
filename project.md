@@ -64,6 +64,7 @@
 
 5. **Baseline Metrics Collection**:
    - Run VAD on 20 diverse Bench2Drive routes (representative sample)
+   - Run VAD on 10-20 Fail2Drive OOD routes to capture the "blind spot" baseline
    - Record: Success Rate, Collision Count, Route Completion %, Avg FPS
    - **Target baseline:** ~60-70% success rate (typical for OOD scenarios)
 
