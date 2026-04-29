@@ -13,17 +13,7 @@
 ### Week 1-2: Infrastructure Hardening (April 23 – May 6)
 **Critical path items:**
 
-1. **Speed Fix Deployment** (Day 1-2):
-   ```python
-   # In VAD_transformer.py, line 248:
-   # OLD: tensor = torch.tensor(numpy_list)  
-   # NEW: tensor = torch.from_numpy(np.stack(numpy_list))
-   ```
-   - Apply the fix
-   - Run 5 test routes, measure sim/real ratio
-   - **Success metric:** Achieve ≥0.3x ratio (target: 0.5x)
-
-2. **Minimal Scenario Setup** (Day 3-5):
+1. **Minimal Scenario Setup** (Day 3-5):
    - Modify `routes_testing.xml` to create 5 "canonical failure" scenarios:
      - Scenario A: Static crate in straight lane
      - Scenario B: Traffic cone mid-turn
@@ -32,20 +22,7 @@
      - Scenario E: Construction barrier cluster
    - Use `--num-vehicles 0` for initial testing
    - **Success metric:** Each scenario runs to completion at ≥0.3x ratio
-
-3. **BEV Visualization Pipeline** (Day 6-10):
-   ```python
-   # In VADAgent.run_step():
-   # Extract BEV queries
-   agent_queries = output_dict['agent_queries']  # Shape: [N, 256]
-   map_queries = output_dict['map_queries']      # Shape: [M, 256]
-   
-   # Visualize
-   bev_img = render_bev(agent_queries, map_queries, camera_frame)
-   save_frame(bev_img, timestamp)
-   ```
-   - Create side-by-side recorder: camera feed + BEV visualization
-   - **Success metric:** 1 complete "smoking gun" video showing collision with no BEV vector
+   - Note: Fail2Drive already has scenarios like these, can just reuse them.
 
 ### Week 3: Quantitative Failure Analysis (May 7 – May 15)
 
@@ -72,7 +49,6 @@
 - [ ] 1 "smoking gun" video with BEV visualization
 - [ ] Entropy correlation analysis (scatter plot: entropy vs. collision probability)
 - [ ] Baseline performance table (20 routes)
-- [ ] Infrastructure achieving ≥0.3x simulation speed
 
 ---
 
