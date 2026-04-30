@@ -38,7 +38,7 @@
    - **Target baseline:** ~60-70% success rate (typical for OOD scenarios)
 
 **Phase 1 Deliverables:**
-- [ ] 1 "smoking gun" video with BEV visualization
+- [X] 1 "smoking gun" video with BEV visualization
 - [ ] Entropy correlation analysis (scatter plot: entropy vs. collision probability)
 - [ ] Baseline performance table (20 routes)
 
