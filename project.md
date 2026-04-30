@@ -8,21 +8,13 @@
 ---
 
 ## Phase 1: Diagnostic Foundation (April 23 – May 15)
-**Objective:** Establish quantitative proof of VAD's geometric blind spot + achieve simulation efficiency
+**Objective:** Establish quantitative proof of VAD's geometric blind spot 
 
 ### Week 1-2: Infrastructure Hardening (April 23 – May 6)
 **Critical path items:**
 
 1. **Minimal Scenario Setup** (Day 3-5):
-   - Modify `routes_testing.xml` to create 5 "canonical failure" scenarios:
-     - Scenario A: Static crate in straight lane
-     - Scenario B: Traffic cone mid-turn
-     - Scenario C: Fallen debris (branch/barrel)
-     - Scenario D: Unexpected static vehicle (perpendicular)
-     - Scenario E: Construction barrier cluster
-   - Use `--num-vehicles 0` for initial testing
-   - **Success metric:** Each scenario runs to completion at ≥0.3x ratio
-   - Note: Fail2Drive already has scenarios like these, can just reuse them.
+   - Check Fail2Drive scnearios and watch VAD crash into stuff.
 
 ### Week 3: Quantitative Failure Analysis (May 7 – May 15)
 
